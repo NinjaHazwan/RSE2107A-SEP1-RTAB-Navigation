@@ -1,0 +1,78 @@
+<?xml version="1"?>
+<launch>
+  <arg name="localization"      default="false"/>
+  <arg name="wait_for_transform"  default="0.5"/>
+  <arg name="database_path"     default="rtabmap.db"/>
+
+  <arg     if="$(arg localization)" name="args"  default=""/>
+  <arg unless="$(arg localization)" name="args"  default="--delete_db_on_start"/>
+
+  <group ns="rtabmap">
+
+    <!-- RGBD Synchronization (updated approx_sync for your camera) -->
+    <node pkg="nodelet" type="nodelet" name="rgbd_sync" args="standalone rtabmap_ros/rgbd_sync" output="screen">
+      <remap from="rgb/image"       to="/camera/rgb/image_converted"/>
+      <remap from="depth/image"     to="/camera/depth/image_rect"/>
+      <remap from="rgb/camera_info" to="/camera/rgb/image_converted/camera_info"/>
+      <remap from="rgbd_image"      to="rgbd_image"/>
+      
+      <!-- Set to TRUE for Xtion/Kinect v1, FALSE for RealSense/Kinect v2 -->
+      <param name="approx_sync"     value="true"/>  <!-- Updated to match your sensor -->
+    </node>
+
+    <node name="rtabmap" pkg="rtabmap_ros" type="rtabmap" output="screen" args="$(arg args)">
+          <!-- Base Configuration -->
+          <param name="frame_id" type="string" value="base_link"/>
+          <param name="subscribe_depth" type="bool" value="false"/>
+          <param name="subscribe_rgb" type="bool" value="false"/>
+          <param name="subscribe_rgbd" type="bool" value="true"/>
+          <param name="subscribe_scan" type="bool" value="true"/>
+          
+          <!-- Topic Remappings -->
+          <remap from="odom" to="/odom"/>
+          <remap from="scan" to="/scan"/>
+          <remap from="rgbd_image" to="rgbd_image"/>
+          <remap from="rgb/image" to="/camera/rgb/image_raw"/>
+          <remap from="depth/image" to="/camera/depth/image_raw"/>
+          <remap from="rgb/camera_info" to="/camera/rgb/image_converted/camera_info"/>
+          <param name="queue_size" type="int" value="50"/>
+          <remap from="grid_map" to="/map"/>
+
+          <!-- ===== UPDATED PARAMETERS ===== -->
+          <!-- Anti-Overlap & Loop Closure -->
+          <param name="RGBD/ProximityPathMaxNeighbors" type="string" value="0"/>
+          <param name="RGBD/NeighborLinkRefining"      type="string" value="true"/>
+          <param name="RGBD/ProximityBySpace"          type="string" value="true"/>
+          <param name="RGBD/OptimizeMaxError"          type="string" value="1.0"/>
+          <param name="Optimizer/Iterations"           type="string" value="20"/>  <!-- Updated name -->
+          <param name="RGBD/LoopClosureReextractFeatures" type="string" value="true"/>
+
+          <!-- Anti-Tilt & 2D Mapping -->
+          <param name="Reg/Force3DoF"             type="string" value="true"/>
+          <param name="Reg/Strategy"              type="string" value="1"/> <!-- 1=ICP -->
+          <param name="use_imu_orientation"       type="bool"   value="true"/> <!-- Enable if IMU available -->
+          <param name="gravity_align_map"         type="bool"   value="true"/>
+
+          <!-- Smoother Updates -->
+          <param name="RGBD/AngularUpdate"        type="string" value="0.05"/>
+          <param name="RGBD/LinearUpdate"         type="string" value="0.05"/>
+          
+          <!-- Scan Matching (LIDAR) -->
+          <param name="Icp/VoxelSize"                 type="string" value="0.05"/>
+          <param name="Icp/MaxCorrespondenceDistance" type="string" value="0.1"/>
+          <param name="Icp/PointToPlane"              type="string" value="true"/>
+
+          <!-- Grid Map Parameters (Updated for RTAB-Map 0.21+) -->
+          <param name="Grid/FromDepth"            type="string" value="false"/>
+          <param name="Grid/Sensor"               type="string" value="0"/> <!-- 0=LIDAR, 1=RGB-D -->
+          <param name="Grid/3D"                   type="string" value="false"/>
+          <param name="Grid/CellSize"             type="string" value="0.05"/>
+          <param name="Grid/NoiseFilteringRadius" type="string" value="0.1"/>
+
+          <!-- Localization Mode -->
+          <param     if="$(arg localization)" name="Mem/IncrementalMemory" type="string" value="false"/>
+          <param unless="$(arg localization)" name="Mem/IncrementalMemory" type="string" value="true"/>
+          <param name="Mem/InitWMWithAllNodes" type="string" value="$(arg localization)"/> 
+    </node>
+  </group>
+</launch>
